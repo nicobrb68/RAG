@@ -5,6 +5,13 @@ from typing import Any, Dict, List
 import bm25s
 from pydantic import BaseModel, Field
 from src.models import MinimalSource
+import re
+
+
+def custom_tokenizer(text: str) -> list[str]:
+    text = text.lower()
+    # Cette regex capture les mots complets contenant des lettres
+    return re.findall(r'[a-z0-9_]+', text)
 
 
 class SearchSystem(BaseModel):
@@ -40,7 +47,7 @@ class SearchSystem(BaseModel):
             # il recharge les fichier de stats
             # load_corpus = charger le texte associee pas seulement les stats
             # il recupere les truc quon a save plus tot avec save index
-            self.index_bm25 = bm25s.BM25.load(
+            self.index_bm25 = bm25s.BM25(k1=1.2, b=0.8).load(
                 str(self.bm25_dir), load_corpus=False
             )
             # ouvrir le dico des index
@@ -66,16 +73,17 @@ class SearchSystem(BaseModel):
         """
         if self.index_bm25 is None or not self.all_chunks_raw:
             print(
-                "Error: Empty index file or file not loaded,"
-                "trying to call the loading function..."
+                "Calling the loading function..."
             )
             self.load_index_files()
 
         try:
             # on transforme en token la question
-            query_token = bm25s.tokenize([query])
+            # nettoie avec regex
+            tokens = custom_tokenizer(query)
+            batch_tokens = [tokens]
             # calcul et retour sous forme de index et proba scores
-            index, scores = self.index_bm25.retrieve(query_token, k=k)
+            index, scores = self.index_bm25.retrieve(batch_tokens, k=k)
         except (ValueError, TypeError) as e:
             print(
                 f"Error: problem while looking for the query in data: {e}"
@@ -83,8 +91,12 @@ class SearchSystem(BaseModel):
             return []
 
         retrieved_sources = []
-        for chunk_index in index[0]:
-            full_chunk = self.all_chunks_raw[chunk_index]
+        indices = (
+                   index[0] if hasattr(index, "ndim") 
+                   and index.ndim > 1 else index
+        )
+        for chunk_index in indices:
+            full_chunk = self.all_chunks_raw[int(chunk_index)]
             # On reconstruit l'objet Pydantic
             final_src = MinimalSource(
                 file_path=full_chunk["source"]["file_path"],
