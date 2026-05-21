@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List
 from src.models import MinimalSource
 
+
 class SearchSystem():
     def __init__(self, storage_dir: str = "data/processed"):
         self.storage_dir = Path(storage_dir)
@@ -15,13 +16,13 @@ class SearchSystem():
         self.all_chunks_raw = []
 
     def load_index_files(self):
-        """Charge les fichiers de l'index depuis le disque dur en toute sécurité."""
         try:
             # instanciation 
             # il recharge les fichier de stats
-            # load_corpus = charger aussi le texte associee pas seulement les stats
+            # load_corpus = charger le texte associee pas seulement les stats
             # il recupere les truc quon a save plus tot avec save index
-            self.index_bm25 = bm25s.BM25.load(str(self.bm25_dir), load_corpus=False)
+            self.index_bm25 = bm25s.BM25.load(str(self.bm25_dir),
+                                              load_corpus=False)
             # ouvrir le dico des index 
             with open(self.chunks_file, "r", encoding="utf-8") as f:
                 self.all_chunks_raw = json.load(f)
@@ -54,8 +55,10 @@ class SearchSystem():
         # On reconstruit l'objet Pydantic
             final_src = MinimalSource(
                 file_path=full_chunk["source"]["file_path"],
-                first_character_index=full_chunk["source"]["first_character_index"],
-                last_character_index=full_chunk["source"]["last_character_index"]
+                first_character_index=(full_chunk["source"]
+                                                 ["first_character_index"]),
+                last_character_index=(full_chunk["source"]
+                                                ["last_character_index"])
             )
             retrieved_sources.append(final_src)
 

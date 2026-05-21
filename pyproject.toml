@@ -6,4 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bm25s>=0.3.9",
+    "fire>=0.7.1",
+    "tqdm>=4.67.3",
 ]
