@@ -1,29 +1,49 @@
-import bm25s
-import sys
 import json
+import sys
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
+import bm25s
+from pydantic import BaseModel, Field
 from src.models import MinimalSource
 
 
-class SearchSystem():
-    def __init__(self, storage_dir: str = "data/processed"):
-        self.storage_dir = Path(storage_dir)
-        self.bm25_dir = self.storage_dir / "bm25_index"
-        self.chunks_file = self.storage_dir / "chunks" / "chunks_data.json"
+class SearchSystem(BaseModel):
+    """System to handle BM25 index loading and metadata sequence retrieval.
 
-        self.index_bm25 = None
-        self.all_chunks_raw = []
+    This class complies with Pydantic validation rules requested
+    by the project guidelines.
+    """
+    # le lambda evite d'avoir des datarace sur les chemin
+    # il attend l'instanciation de la classe
+    # et cree deux objet ath different
+    storage_dir: Path = Field(
+        default_factory=lambda: Path("data/processed")
+    )
+    bm25_dir: Path = Field(
+        default_factory=lambda: Path("data/processed/bm25_index")
+    )
+    chunks_file: Path = Field(
+        default_factory=lambda: Path("data/processed/chunks/chunks_data.json")
+    )
+    index_bm25: Any = None
+    all_chunks_raw: List[Dict[str, Any]] = []
 
-    def load_index_files(self):
+    class Config:
+        """Pydantic configuration to allow arbitrary object types."""
+
+        arbitrary_types_allowed = True
+
+    def load_index_files(self) -> None:
+        """Loads BM25 statistics and raw chunk metadata from the disk."""
         try:
-            # instanciation 
+            # instanciation
             # il recharge les fichier de stats
             # load_corpus = charger le texte associee pas seulement les stats
             # il recupere les truc quon a save plus tot avec save index
-            self.index_bm25 = bm25s.BM25.load(str(self.bm25_dir),
-                                              load_corpus=False)
-            # ouvrir le dico des index 
+            self.index_bm25 = bm25s.BM25.load(
+                str(self.bm25_dir), load_corpus=False
+            )
+            # ouvrir le dico des index
             with open(self.chunks_file, "r", encoding="utf-8") as f:
                 self.all_chunks_raw = json.load(f)
 
@@ -35,9 +55,20 @@ class SearchSystem():
             sys.exit(1)
 
     def search(self, query: str, k: int = 10) -> List[MinimalSource]:
+        """Queries the indexed corpus to extract the top-k relevant locations.
+
+        Args:
+            query: The user's query string in natural language.
+            k: The maximum number of relevant documents to return.
+
+        Returns:
+            A list of type-validated MinimalSource Pydantic objects.
+        """
         if self.index_bm25 is None or not self.all_chunks_raw:
-            print("Error: Empty index file or file not loaded,"
-                  "trying to call the loading function...")
+            print(
+                "Error: Empty index file or file not loaded,"
+                "trying to call the loading function..."
+            )
             self.load_index_files()
 
         try:
@@ -46,19 +77,23 @@ class SearchSystem():
             # calcul et retour sous forme de index et proba scores
             index, scores = self.index_bm25.retrieve(query_token, k=k)
         except (ValueError, TypeError) as e:
-            print(f"Error: problem while looking for the query in data: {e}")
+            print(
+                f"Error: problem while looking for the query in data: {e}"
+            )
             return []
 
         retrieved_sources = []
         for chunk_index in index[0]:
             full_chunk = self.all_chunks_raw[chunk_index]
-        # On reconstruit l'objet Pydantic
+            # On reconstruit l'objet Pydantic
             final_src = MinimalSource(
                 file_path=full_chunk["source"]["file_path"],
-                first_character_index=(full_chunk["source"]
-                                                 ["first_character_index"]),
-                last_character_index=(full_chunk["source"]
-                                                ["last_character_index"])
+                first_character_index=(
+                    full_chunk["source"]["first_character_index"]
+                ),
+                last_character_index=(
+                    full_chunk["source"]["last_character_index"]
+                ),
             )
             retrieved_sources.append(final_src)
 

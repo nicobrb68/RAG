@@ -1,3 +1,8 @@
+import fire
+from pydantic import BaseModel, field
+
+
+
 def main():
     print("Hello from rag!")
 
