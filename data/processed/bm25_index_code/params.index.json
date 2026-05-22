@@ -1,6 +1,6 @@
 {
     "k1": 1.5,
-    "b": 0.7,
+    "b": 0.8,
     "delta": 0.5,
     "method": "lucene",
     "idf_method": "lucene",

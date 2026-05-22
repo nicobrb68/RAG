@@ -178,7 +178,7 @@ class CodeIndexer(BaseModel):
         # 2. INDEXATION DU CODE
         if chunks_code:
             try:
-                index_code = bm25s.BM25(k1=1.5, b=0.7)
+                index_code = bm25s.BM25(k1=1.5, b=0.8)
                 texts_code = [c.text_content for c in chunks_code]
                 tokens_code = [custom_tokenizer(t, is_code=True) for t in texts_code]
                 index_code.index(tokens_code)
