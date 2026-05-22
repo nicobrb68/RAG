@@ -44,7 +44,7 @@ class CodeIndexer(BaseModel):
             overlap = 380
             target_size = 1650 - overlap  
         else:
-            les_separateurs = ["\n\n", "\n", " ", ""]
+            les_separateurs = [" "]
             overlap = 380
             target_size = 1880 - overlap
 
