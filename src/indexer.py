@@ -38,14 +38,15 @@ class CodeIndexer(BaseModel):
             sys.exit(1)
 
         # SECTORISATION CHIRURGICALE CODE VS DOC
+        # SECTORISATION CHIRURGICALE CODE VS DOC
         if path.suffix == ".py":
             les_separateurs = [""]
-            overlap = 300  # Gros overlap pour ne rater aucune transition de fonction
-            target_size = 1200 - overlap  # Blocs de code denses et précis
+            overlap = 300
+            target_size = 1400 - overlap  
         else:
             les_separateurs = ["\n\n", "\n", " ", ""]
             overlap = 200
-            target_size = 1800 - overlap  # Gros blocs pour la doc textuelle
+            target_size = 1800 - overlap
 
         chunked_data = CodeIndexer.split_text_recursive(
             text=full_data,
@@ -163,22 +164,23 @@ class CodeIndexer(BaseModel):
         chunks_code = [c for c in all_chunk if c.source.file_path.endswith(".py")]
 
         # 1. INDEXATION DES DOCS (k1=1.5, b=0.7 pour le texte naturel)
+        # 1. INDEXATION DES DOCS
         if chunks_docs:
             try:
                 index_docs = bm25s.BM25(k1=1.5, b=0.7)
                 texts_docs = [c.text_content for c in chunks_docs]
-                tokens_docs = [custom_tokenizer(t) for t in texts_docs]
+                tokens_docs = [custom_tokenizer(t, is_code=False) for t in texts_docs]
                 index_docs.index(tokens_docs)
                 index_docs.save(str(directory_bm25_docs), corpus=texts_docs)
             except (OSError, PermissionError, ValueError, TypeError) as e:
                 print(f"Error: BM25 docs indexing failed ({e})")
 
-        # 2. INDEXATION DU CODE (k1=1.2, b=0.9 pour isoler le code technique dense)
+        # 2. INDEXATION DU CODE
         if chunks_code:
             try:
-                index_code = bm25s.BM25(k1=1.2, b=0.9)
+                index_code = bm25s.BM25(k1=1.5, b=0.7)
                 texts_code = [c.text_content for c in chunks_code]
-                tokens_code = [custom_tokenizer(t) for t in texts_code]
+                tokens_code = [custom_tokenizer(t, is_code=True) for t in texts_code]
                 index_code.index(tokens_code)
                 index_code.save(str(directory_bm25_code), corpus=texts_code)
             except (OSError, PermissionError, ValueError, TypeError) as e:

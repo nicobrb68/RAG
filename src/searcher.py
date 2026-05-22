@@ -8,10 +8,20 @@ from src.models import MinimalSource
 import re
 
 
-def custom_tokenizer(text: str) -> list[str]:
+def custom_tokenizer(text: str, is_code: bool = False) -> list[str]:
     text = text.lower()
-    # Cette regex capture les mots complets contenant des lettres
-    return re.findall(r'[a-z0-9_]+', text)
+    # On revient à la regex de base propre sans le point
+    tokens = re.findall(r'[a-z0-9_]+', text)
+    
+    # Si c'est du code, on aide le BM25 en éclatant aussi les expressions (ex: "fused_moe" -> "fused", "moe")
+    if is_code:
+        sub_tokens = []
+        for token in tokens:
+            if "_" in token:
+                sub_tokens.extend([t for t in token.split("_") if len(t) > 2])
+        return tokens + sub_tokens
+        
+    return tokens
 
 
 class SearchSystem(BaseModel):
@@ -34,6 +44,7 @@ class SearchSystem(BaseModel):
     )
     index_bm25: Any = None
     all_chunks_raw: List[Dict[str, Any]] = []
+    index_type_meta: str = "docs"
 
     class Config:
         """Pydantic configuration to allow arbitrary object types."""
@@ -43,17 +54,16 @@ class SearchSystem(BaseModel):
     def load_index_files(self, index_type: str = "docs") -> None:
         """Loads BM25 statistics and raw chunk metadata from the disk."""
         try:
+            self.index_type_meta = index_type
             target_dir = self.storage_dir / f"bm25_index_{index_type}"
             
             self.index_bm25 = bm25s.BM25().load(
                 str(target_dir), load_corpus=False
             )
-            
-            # 1. Charger tous les chunks bruts sauvés par l'indexeur
+
             with open(self.chunks_file, "r", encoding="utf-8") as f:
                 all_chunks = json.load(f)
-                
-            # 2. ALIGNEMENT CRUCIAL : On ne garde que les chunks du même type !
+
             if index_type == "code":
                 self.all_chunks_raw = [c for c in all_chunks if c["source"]["file_path"].endswith(".py")]
             else:
@@ -83,11 +93,11 @@ class SearchSystem(BaseModel):
             self.load_index_files()
 
         try:
-            # on transforme en token la question
-            # nettoie avec regex
-            tokens = custom_tokenizer(query)
-            batch_tokens = [tokens]
-            # calcul et retour sous forme de index et proba scores
+            # On passe l'information du type d'index au tokenizer
+            is_code_mode = (self.index_type_meta == "code")
+            tokens = custom_tokenizer(query, is_code=is_code_mode)
+            
+            batch_tokens = [tokens] 
             index, scores = self.index_bm25.retrieve(batch_tokens, k=k)
         except (ValueError, TypeError) as e:
             print(
