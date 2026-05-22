@@ -1,0 +1,15 @@
+Student data is valid: True
+Total number of questions: 100
+Total number of questions with sources: 100
+Total number of questions with student sources: 100
+
+🎯 Evaluation Results
+========================================
+📊 Questions evaluated: 100
+📈 Recall@1: 0.380 (38.0%)
+📈 Recall@3: 0.550 (55.0%)
+📈 Recall@5: 0.620 (62.0%)
+📈 Recall@10: 0.680 (68.0%)
+{'recall@1': 0.38, 'recall@3': 0.55, 'recall@5': 0.62, 'recall@10': 0.68}
+PASS: Recall@5 = 0.620 >= 0.5
+True

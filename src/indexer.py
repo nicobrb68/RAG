@@ -42,7 +42,7 @@ class CodeIndexer(BaseModel):
         if path.suffix == ".py":
             les_separateurs = [""]
             overlap = 380
-            target_size = 1600 - overlap  
+            target_size = 1650 - overlap  
         else:
             les_separateurs = ["\n\n", "\n", " ", ""]
             overlap = 380
