@@ -46,7 +46,7 @@ class CodeIndexer(BaseModel):
         else:
             les_separateurs = [" "]
             overlap = 380
-            target_size = 1880 - overlap
+            target_size = 1830 - overlap
 
         chunked_data = CodeIndexer.split_text_recursive(
             text=full_data,
