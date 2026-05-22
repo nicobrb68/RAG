@@ -26,9 +26,18 @@ def custom_tokenizer(text: str, is_code: bool = False) -> list[str]:
                 sub_tokens.extend([t for t in token.split("_") if len(t) > 2])
         return tokens + sub_tokens
         
-    # 2. Traitement spécifique pour la Doc : Filtrage des Stopwords
-    return [t for t in tokens if t not in STOPWORDS]
-
+    # 2. Traitement spécifique pour la Doc : Ton code d'origine + Stopwords élargis
+    # On ajoute des mots parasites spécifiques aux questions/réponses de doc
+    mots_parasites = {
+        "comment", "faire", "dans", "plus", "avec", "tout", "cette", "dans",
+        "pour", "sur", "les", "des", "une", "how", "to", "the", "and", "you",
+        "votre", "notre", "peut", "avoir", "etre", "utiliser", "application"
+    }
+    
+    # On fusionne tes STOPWORDS d'origine avec les nôtres
+    stop_total = set(STOPWORDS).union(mots_parasites)
+    
+    return [t for t in tokens if t not in stop_total]
 class SearchSystem(BaseModel):
     """System to handle BM25 index loading and metadata sequence retrieval.
 

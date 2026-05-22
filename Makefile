@@ -42,16 +42,19 @@ clean:
 	rm -rf data/processed/bm25_index
 	rm -rf data/processed/chunks
 	rm -f $(RESULT_JSON)
+	rm -f data/output/search_results/*_results.json
 	@echo "$(GREEN) Nettoyage terminé !$(RESET)"
 
 index: clean
 	@echo "$(BLUE) Extraction et indexation du jeu de données brut...$(RESET)"
-	uv run python main.py index
+	uv run python -m src index
 
 test-docs:
 	@echo "\n$(BLUE)============== TEST DATASET : DOCUMENTATION ==============$(RESET)"
 	@echo "$(YELLOW)1. Exécution de la recherche sur les questions Docs...$(RESET)"
-	uv run python main.py search_dataset $(DS_DOCS_UNANSWERED) --k $(K)
+	uv run python -m src search_dataset $(DS_DOCS_UNANSWERED) --k $(K)
+	@echo "$(YELLOW)[HACK OPTION C] Préparation du fichier pour la moulinette...$(RESET)"
+	cp data/output/search_results/dataset_docs_public_results.json $(RESULT_JSON)
 	@echo "$(YELLOW)2. Lancement de l'évaluation par la moulinette...$(RESET)"
 	$(MOULINETTE) evaluate_student_search_results \
 		$(RESULT_JSON) \
@@ -63,7 +66,9 @@ test-docs:
 test-code:
 	@echo "\n$(BLUE)============== TEST DATASET : CODE SOURCE ==============$(RESET)"
 	@echo "$(YELLOW)1. Exécution de la recherche sur les questions Code...$(RESET)"
-	uv run python main.py search_dataset $(DS_CODE_UNANSWERED) --k $(K)
+	uv run python -m src search_dataset $(DS_CODE_UNANSWERED) --k $(K)
+	@echo "$(YELLOW)[HACK OPTION C] Préparation du fichier pour la moulinette...$(RESET)"
+	cp data/output/search_results/dataset_code_public_results.json $(RESULT_JSON)
 	@echo "$(YELLOW)2. Lancement de l'évaluation par la moulinette...$(RESET)"
 	$(MOULINETTE) evaluate_student_search_results \
 		$(RESULT_JSON) \
@@ -73,4 +78,4 @@ test-code:
 		--threshold $(THRESHOLD)
 
 test-all: index test-docs test-code
-	@echo "\n$(GREEN) Pipeline complet exécuté avec succès !Vérifie tes scores ci-dessus.$(RESET)"
+	@echo "\n$(GREEN) Pipeline complet exécuté avec succès ! Vérifie tes scores ci-dessus.$(RESET)"
