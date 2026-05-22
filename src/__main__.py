@@ -106,7 +106,11 @@ class RagCLI:
         try:
             out_dir = Path(save_directory)
             out_dir.mkdir(parents=True, exist_ok=True)
-            output_file = out_dir / "generated_search_results.json"
+            
+            # --- CORRECTION NOMMAGE DYNAMIQUE POUR LE SCRIPT D'EXAMEN ---
+            input_filename = Path(dataset_path).stem  # Récupère ex: "dataset_docs_private"
+            output_file = out_dir / f"{input_filename}_results.json"
+            # ------------------------------------------------------------
 
             final_output = {
                 "search_results": search_results_list,
@@ -116,8 +120,7 @@ class RagCLI:
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(final_output, f, ensure_ascii=False, indent=4)
 
-            print(f"Dataset processed successfully! Results saved "
-                  f"to {output_file}")
+            print(f"Dataset processed successfully! Results saved to {output_file}")
 
         except (PermissionError, FileNotFoundError) as e:
             print(f"Error: Failed to save results to disk. Details: {e}")

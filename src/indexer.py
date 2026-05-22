@@ -46,7 +46,7 @@ class CodeIndexer(BaseModel):
         else:
             les_separateurs = ["\n\n", "\n", " ", ""]
             overlap = 380
-            target_size = 1780 - overlap
+            target_size = 1980 - overlap
 
         chunked_data = CodeIndexer.split_text_recursive(
             text=full_data,
@@ -167,7 +167,7 @@ class CodeIndexer(BaseModel):
         # 1. INDEXATION DES DOCS
         if chunks_docs:
             try:
-                index_docs = bm25s.BM25(k1=1.5, b=0.9)
+                index_docs = bm25s.BM25(k1=1.5, b=0.7)
                 texts_docs = [c.text_content for c in chunks_docs]
                 tokens_docs = [custom_tokenizer(t, is_code=False) for t in texts_docs]
                 index_docs.index(tokens_docs)
@@ -178,7 +178,7 @@ class CodeIndexer(BaseModel):
         # 2. INDEXATION DU CODE
         if chunks_code:
             try:
-                index_code = bm25s.BM25(k1=1.5, b=0.8)
+                index_code = bm25s.BM25(k1=1.5, b=0.7)
                 texts_code = [c.text_content for c in chunks_code]
                 tokens_code = [custom_tokenizer(t, is_code=True) for t in texts_code]
                 index_code.index(tokens_code)
