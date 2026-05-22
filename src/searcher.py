@@ -7,26 +7,27 @@ from pydantic import BaseModel, Field
 from src.models import MinimalSource
 import re
 
+# Liste des mots vides anglais les plus fréquents qui parasitent le BM25 dans la doc
+STOPWORDS = {"the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "of", "to", "in", "for", "with", "on", "at", "by", "from", "this", "that", "it", "you", "your"}
+
 def custom_tokenizer(text: str, is_code: bool = False) -> list[str]:
-    # 1. Si c'est du code, on extrait d'abord les sous-mots CamelCase AVANT le lower()
+    # 1. Traitement spécifique pour le Code
     sub_tokens = []
     if is_code:
-        # Trouve les transitions de majuscules (ex: FlashAttention -> Flash, Attention)
         camel_tokens = re.findall(r'[A-Z][a-z0-9]+', text)
         sub_tokens.extend([c.lower() for c in camel_tokens if len(c) > 2])
 
     text = text.lower()
     tokens = re.findall(r'[a-z0-9_]+', text)
     
-    # 2. On éclate le Snake Case comme tout à l'heure
     if is_code:
         for token in tokens:
             if "_" in token:
                 sub_tokens.extend([t for t in token.split("_") if len(t) > 2])
         return tokens + sub_tokens
         
-    return tokens
-
+    # 2. Traitement spécifique pour la Doc : Filtrage des Stopwords
+    return [t for t in tokens if t not in STOPWORDS]
 
 class SearchSystem(BaseModel):
     """System to handle BM25 index loading and metadata sequence retrieval.
@@ -81,50 +82,26 @@ class SearchSystem(BaseModel):
             sys.exit(1)
 
     def search(self, query: str, k: int = 10) -> List[MinimalSource]:
-        """Queries the indexed corpus to extract the top-k relevant locations.
-
-        Args:
-            query: The user's query string in natural language.
-            k: The maximum number of relevant documents to return.
-
-        Returns:
-            A list of type-validated MinimalSource Pydantic objects.
-        """
         if self.index_bm25 is None or not self.all_chunks_raw:
-            print(
-                "Calling the loading function..."
-            )
             self.load_index_files()
 
         try:
-            # On passe l'information du type d'index au tokenizer
             is_code_mode = (self.index_type_meta == "code")
             tokens = custom_tokenizer(query, is_code=is_code_mode)
-            
-            batch_tokens = [tokens] 
+            batch_tokens = [tokens]
             index, scores = self.index_bm25.retrieve(batch_tokens, k=k)
         except (ValueError, TypeError) as e:
-            print(
-                f"Error: problem while looking for the query in data: {e}"
-            )
+            print(f"Error: problem while looking for the query in data: {e}")
             return []
 
         retrieved_sources = []
-        indices = (
-                   index[0] if hasattr(index, "ndim") 
-                   and index.ndim > 1 else index
-        )
+        indices = index[0] if hasattr(index, "ndim") and index.ndim > 1 else index
         for chunk_index in indices:
             full_chunk = self.all_chunks_raw[int(chunk_index)]
-            # On reconstruit l'objet Pydantic
             final_src = MinimalSource(
                 file_path=full_chunk["source"]["file_path"],
-                first_character_index=(
-                    full_chunk["source"]["first_character_index"]
-                ),
-                last_character_index=(
-                    full_chunk["source"]["last_character_index"]
-                ),
+                first_character_index=full_chunk["source"]["first_character_index"],
+                last_character_index=full_chunk["source"]["last_character_index"],
             )
             retrieved_sources.append(final_src)
 
