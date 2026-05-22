@@ -40,19 +40,24 @@ class SearchSystem(BaseModel):
 
         arbitrary_types_allowed = True
 
-    def load_index_files(self) -> None:
+    def load_index_files(self, index_type: str = "docs") -> None:
         """Loads BM25 statistics and raw chunk metadata from the disk."""
         try:
-            # instanciation
-            # il recharge les fichier de stats
-            # load_corpus = charger le texte associee pas seulement les stats
-            # il recupere les truc quon a save plus tot avec save index
-            self.index_bm25 = bm25s.BM25(k1=1.2, b=0.8).load(
-                str(self.bm25_dir), load_corpus=False
+            target_dir = self.storage_dir / f"bm25_index_{index_type}"
+            
+            self.index_bm25 = bm25s.BM25().load(
+                str(target_dir), load_corpus=False
             )
-            # ouvrir le dico des index
+            
+            # 1. Charger tous les chunks bruts sauvés par l'indexeur
             with open(self.chunks_file, "r", encoding="utf-8") as f:
-                self.all_chunks_raw = json.load(f)
+                all_chunks = json.load(f)
+                
+            # 2. ALIGNEMENT CRUCIAL : On ne garde que les chunks du même type !
+            if index_type == "code":
+                self.all_chunks_raw = [c for c in all_chunks if c["source"]["file_path"].endswith(".py")]
+            else:
+                self.all_chunks_raw = [c for c in all_chunks if not c["source"]["file_path"].endswith(".py")]
 
         except (ValueError, TypeError) as e:
             print(f"Error: Cannot load index file : {e}")

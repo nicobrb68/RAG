@@ -48,8 +48,14 @@ class RagCLI:
     ) -> None:
         """Processes a JSON dataset and saves the retrieval results."""
         searcher = SearchSystem()
+        if "code" in dataset_path.lower():
+            target_index = "code"
+        else:
+            target_index = "docs"
+            
         try:
-            searcher.load_index_files()
+            # On charge l'index spécialisé
+            searcher.load_index_files(index_type=target_index)
         except (PermissionError, FileNotFoundError, OSError) as e:
             print(f"Error: Failed to load index files. Aborting. Details: {e}")
             return
