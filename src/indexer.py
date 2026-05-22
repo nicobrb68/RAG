@@ -41,12 +41,12 @@ class CodeIndexer(BaseModel):
         # SECTORISATION CHIRURGICALE CODE VS DOC
         if path.suffix == ".py":
             les_separateurs = [""]
-            overlap = 320
-            target_size = 1400 - overlap  
+            overlap = 380
+            target_size = 1600 - overlap  
         else:
             les_separateurs = ["\n\n", "\n", " ", ""]
             overlap = 380
-            target_size = 1980 - overlap
+            target_size = 1880 - overlap
 
         chunked_data = CodeIndexer.split_text_recursive(
             text=full_data,
