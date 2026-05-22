@@ -7,15 +7,19 @@ from pydantic import BaseModel, Field
 from src.models import MinimalSource
 import re
 
-
 def custom_tokenizer(text: str, is_code: bool = False) -> list[str]:
+    # 1. Si c'est du code, on extrait d'abord les sous-mots CamelCase AVANT le lower()
+    sub_tokens = []
+    if is_code:
+        # Trouve les transitions de majuscules (ex: FlashAttention -> Flash, Attention)
+        camel_tokens = re.findall(r'[A-Z][a-z0-9]+', text)
+        sub_tokens.extend([c.lower() for c in camel_tokens if len(c) > 2])
+
     text = text.lower()
-    # On revient à la regex de base propre sans le point
     tokens = re.findall(r'[a-z0-9_]+', text)
     
-    # Si c'est du code, on aide le BM25 en éclatant aussi les expressions (ex: "fused_moe" -> "fused", "moe")
+    # 2. On éclate le Snake Case comme tout à l'heure
     if is_code:
-        sub_tokens = []
         for token in tokens:
             if "_" in token:
                 sub_tokens.extend([t for t in token.split("_") if len(t) > 2])
