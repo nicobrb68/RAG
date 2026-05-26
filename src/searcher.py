@@ -36,19 +36,12 @@ def custom_tokenizer(text: str, is_code: bool = False) -> list[str]:
             if "_" in token:
                 sub_tokens.extend([t for t in token.split("_") if len(t) > 2])
         return tokens + sub_tokens
-        
-    # 2. Traitement spécifique pour la Doc : Ton code d'origine + Stopwords élargis
-    # On ajoute des mots parasites spécifiques aux questions/réponses de doc
-    mots_parasites = {
-        "comment", "faire", "dans", "plus", "avec", "tout", "cette", "dans",
-        "pour", "sur", "les", "des", "une", "how", "to", "the", "and", "you",
-        "votre", "notre", "peut", "avoir", "etre", "utiliser", "application"
-    }
-    
+
     # On fusionne tes STOPWORDS d'origine avec les nôtres
-    stop_total = set(STOPWORDS).union(mots_parasites)
+    stop_total = set(STOPWORDS)
     
     return [t for t in tokens if t not in stop_total]
+
 class SearchSystem(BaseModel):
     """System to handle BM25 index loading and metadata sequence retrieval.
 
@@ -108,24 +101,21 @@ class SearchSystem(BaseModel):
         try:
             is_code_mode = (self.index_type_meta == "code")
             
-            # --- QUERY STRIPPING UNIQUEMENT POUR LA DOC ---
+            # --- TON QUERY STRIPPING VALIDÉ ---
             if not is_code_mode:
-                # On retire les verbes et tournures de questions courantes qui polluent le score
+                # Ta liste exacte qui fait monter le Recall@1 et @3
                 question_words = {
-                     "using", "use", "does", "do", "can", "should", 
-                    "must", "be", "command",
-                    "happen", "happens",
+                    "using",
+                    "command"
                 }
                 
-                # Extraction des mots de la query en minuscules
+                # Découpage propre en nettoyant la ponctuation autour des mots
                 raw_words = query.lower().split()
-                # On ne garde que ce qui n'est pas dans les mots de question
-                cleaned_query = " ".join([w for w in raw_words if w.strip("?,.:;!") not in question_words])
+                cleaned_words = [w for w in raw_words if w.strip("?,.:;!") not in question_words]
                 
-                # Si le nettoyage n'a pas vidé la requête, on utilise la version propre
-                if cleaned_query.strip():
-                    query = cleaned_query
-            # ----------------------------------------------
+                if cleaned_words:
+                    query = " ".join(cleaned_words)
+            # ----------------------------------
 
             tokens = custom_tokenizer(query, is_code=is_code_mode)
             batch_tokens = [tokens]

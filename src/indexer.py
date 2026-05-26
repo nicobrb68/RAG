@@ -89,7 +89,7 @@ class CodeIndexer(BaseModel):
                              separators: list[str] = None) -> list[str]:
         """Découpe un texte de manière récursive en respectant la syntaxe d'origine."""
         if separators is None:
-            separators = ["\n\n", "\n", ""]
+            separators = [""]
 
         if len(text) <= max_size:
             return [text]

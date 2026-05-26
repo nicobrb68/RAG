@@ -3,7 +3,7 @@
     "b": 0.83,
     "delta": 0.5,
     "method": "lucene",
-    "idf_method": "lucene",
+    "idf_method": "atire",
     "dtype": "float32",
     "int_dtype": "int32",
     "num_docs": 823,
