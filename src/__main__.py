@@ -1,8 +1,8 @@
+import json
+from pathlib import Path
 import fire
 from src.indexer import CodeIndexer
 from src.searcher import SearchSystem
-from pathlib import Path
-import json
 
 
 class RagCLI:
@@ -10,15 +10,13 @@ class RagCLI:
 
     def index(self, max_chunk_size: int = 2000) -> None:
         """Processes and indexes the vLLM repository.
+
         Args:
-        max_chunk_size: Maximum character length for each chunk.
+            max_chunk_size: Maximum character length for each chunk.
         """
         print(f"Starting indexing with max_chunk_size={max_chunk_size}...")
-        # instancie indexeur pydantic
         indexer = CodeIndexer(max_chunk_size=max_chunk_size)
-        # parcours du dossier brut vllm
         chunks = indexer.path_to_directory("data/raw/vllm-0.10.1")
-        # sauvegarde dans "data/processed"
         indexer.save_index(chunks)
 
     def search(self, query: str, k: int = 10) -> None:
@@ -29,22 +27,22 @@ class RagCLI:
             k: The maximum number of relevant documents to return.
         """
         print(f"Searching for: '{query}' (top-{k})...")
-        # instancie la classe de recherche
         searcher = SearchSystem()
-        # effectue la recherche
         results = searcher.search(query=query, k=k)
 
         for i, src in enumerate(results, 1):
             print(f"\n[{i}] Result found:")
             print(f"  Path: {src.file_path}")
-            print(f"  Pos: {src.first_character_index} ->"
-                  f" {src.last_character_index}")
+            print(
+                f"  Pos: {src.first_character_index} ->"
+                f" {src.last_character_index}"
+            )
 
     def search_dataset(
         self,
         dataset_path: str,
         k: int = 10,
-        save_directory: str = "data/output/search_results"
+        save_directory: str = "data/output/search_results",
     ) -> None:
         """Processes a JSON dataset and saves the retrieval results."""
         searcher = SearchSystem()
@@ -52,25 +50,26 @@ class RagCLI:
             target_index = "code"
         else:
             target_index = "docs"
-            
+
         try:
-            # On charge l'index spécialisé
             searcher.load_index_files(index_type=target_index)
         except (PermissionError, FileNotFoundError, OSError) as e:
-            print(f"Error: Failed to load index files. Aborting. Details: {e}")
+            print(f"Error: Failed to load index files. Details: {e}")
             return
 
         try:
             with open(dataset_path, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
-                # On extrait la liste sous 'rag_questions' si le JSON est enveloppé dans un dict
-                dataset = raw_data.get("rag_questions", raw_data) if isinstance(raw_data, dict) else raw_data
+                dataset = (
+                    raw_data.get("rag_questions", raw_data)
+                    if isinstance(raw_data, dict)
+                    else raw_data
+                )
         except FileNotFoundError:
             print(f"Error: The dataset file '{dataset_path}' was not found.")
             return
         except json.JSONDecodeError:
-            print(f"Error: The file '{dataset_path}' is corrupted or"
-                  f" not a valid JSON.")
+            print(f"Error: The file '{dataset_path}' is corrupted.")
             return
         except (PermissionError, OSError) as e:
             print(f"Unexpected error while reading dataset: {e}")
@@ -80,50 +79,136 @@ class RagCLI:
 
         for i, item in enumerate(dataset):
             try:
-                # Vérification que la clé 'query' existe
                 if not isinstance(item, dict) or "question" not in item:
-                    raise KeyError("Missing or invalid 'query' key in item.")
+                    raise KeyError("Missing or invalid 'question' key.")
 
                 query_text = item["question"]
-                # Récupération sécurisée du question_id exigé par la moulinette
                 q_id = item.get("question_id", f"q_{i}")
 
                 sources = searcher.search(query=query_text, k=k)
 
-                search_results_list.append({
-                    "question_id": q_id,
-                    "question": query_text,
-                    "question_str": query_text,
-                    "retrieved_sources": [src.model_dump() for src in sources]
-                })
+                search_results_list.append(
+                    {
+                        "question_id": q_id,
+                        "question": query_text,
+                        "question_str": query_text,
+                        "retrieved_sources": [
+                            src.model_dump() for src in sources
+                        ],
+                    }
+                )
 
             except KeyError as ke:
                 print(f"Warning [Item {i}]: {ke} Skipping line.")
             except (PermissionError, OSError) as e:
-                print(f"Warning [Item {i}]: Unexpected error processing query."
-                      f"Details: {e}. Skipping line.")
+                print(
+                    f"Warning [Item {i}]: Unexpected error. "
+                    f"Details: {e}. Skipping line."
+                )
 
         try:
             out_dir = Path(save_directory)
             out_dir.mkdir(parents=True, exist_ok=True)
-            
-            # --- CORRECTION NOMMAGE DYNAMIQUE POUR LE SCRIPT D'EXAMEN ---
-            input_filename = Path(dataset_path).stem  # Récupère ex: "dataset_docs_private"
-            output_file = out_dir / f"{input_filename}_results.json"
-            # ------------------------------------------------------------
 
-            final_output = {
-                "search_results": search_results_list,
-                "k": k
-            }
+            input_filename = Path(dataset_path).stem
+            output_file = out_dir / f"{input_filename}_results.json"
+
+            final_output = {"search_results": search_results_list, "k": k}
 
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(final_output, f, ensure_ascii=False, indent=4)
 
-            print(f"Dataset processed successfully! Results saved to {output_file}")
+            print(f"Dataset processed! Results saved to {output_file}")
 
         except (PermissionError, FileNotFoundError) as e:
             print(f"Error: Failed to save results to disk. Details: {e}")
+
+    def answer(self, query: str, k: int = 5) -> None:
+        """Answers a single query using the complete RAG pipeline."""
+        from src.generator import AnswerGenerator
+
+        searcher = SearchSystem()
+
+        target_index = (
+            "code"
+            if any(
+                x in query.lower()
+                for x in [".py", "def ", "class ", "_"]
+            )
+            else "docs"
+        )
+        searcher.load_index_files(index_type=target_index)
+
+        sources = searcher.search(query=query, k=k)
+
+        contexts = []
+        for src in sources:
+            for chunk in searcher.all_chunks_raw:
+                if (
+                    chunk["source"]["file_path"] == src.file_path
+                    and chunk["source"]["first_character_index"]
+                    == src.first_character_index
+                ):
+                    contexts.append(chunk["text_content"])
+
+        generator = AnswerGenerator(model_name="Qwen/Qwen3-0.6B")
+        response = generator.generate_answer(query=query, contexts=contexts)
+
+        print(response)
+
+    def answer_dataset(
+        self,
+        dataset_path: str,
+        k: int = 5,
+        save_directory: str = "data/output/generation_results",
+    ) -> None:
+        """Processes a complete dataset to generate text answers."""
+        from src.generator import AnswerGenerator
+
+        searcher = SearchSystem()
+        generator = AnswerGenerator()
+
+        target_index = "code" if "code" in dataset_path.lower() else "docs"
+        searcher.load_index_files(index_type=target_index)
+
+        with open(dataset_path, "r", encoding="utf-8") as f:
+            dataset = json.load(f).get("rag_questions", [])
+
+        generation_results_list = []
+        for item in dataset:
+            query_text = item["question"]
+            sources = searcher.search(query=query_text, k=k)
+
+            contexts = [
+                c["text_content"]
+                for c in searcher.all_chunks_raw
+                for src in sources
+                if c["source"]["file_path"] == src.file_path
+                and c["source"]["first_character_index"]
+                == src.first_character_index
+            ]
+
+            answer_text = generator.generate_answer(
+                question=query_text, contexts=contexts
+            )
+
+            generation_results_list.append(
+                {
+                    "question_id": item.get("question_id"),
+                    "question": query_text,
+                    "generated_answer": answer_text,
+                }
+            )
+
+        out_dir = Path(save_directory)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        output_file = out_dir / f"{Path(dataset_path).stem}_answers.json"
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {"generation_results": generation_results_list}, f, indent=4
+            )
+        print(f"Results saved to {output_file}")
 
 
 def main() -> None:

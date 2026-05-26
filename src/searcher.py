@@ -1,46 +1,126 @@
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
 import bm25s
 from pydantic import BaseModel, Field
 from src.models import MinimalSource
-import re
 
-# Liste des mots vides anglais les plus fréquents qui parasitent le BM25 dans la doc
+# Liste des mots vides anglais les plus fréquents qui parasitent le BM25
 STOPWORDS = {
     # Pronoms et déterminants
-    "the", "a", "an", "this", "that", "these", "those", "it", "its", "my", "your", "his", "her", "their", "our", "you", "i", "he", "she", "we", "they", "me", "him", "them",
-    
+    "the",
+    "a",
+    "an",
+    "this",
+    "that",
+    "these",
+    "those",
+    "it",
+    "its",
+    "my",
+    "your",
+    "his",
+    "her",
+    "their",
+    "our",
+    "you",
+    "i",
+    "he",
+    "she",
+    "we",
+    "they",
+    "me",
+    "him",
+    "them",
     # Prépositions et connecteurs logiques
-    "and", "or", "but", "of", "to", "in", "for", "with", "on", "at", "by", "from", "as", "into", "through", "during", "after", "before", "over", "under", "about",
-    
+    "and",
+    "or",
+    "but",
+    "of",
+    "to",
+    "in",
+    "for",
+    "with",
+    "on",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "after",
+    "before",
+    "over",
+    "under",
+    "about",
     # Auxiliaires et verbes d'état fréquents
-    "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "can", "could", "should", "would", "will", "may", "might", "must",
-    
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "can",
+    "could",
+    "should",
+    "would",
+    "will",
+    "may",
+    "might",
+    "must",
     # Adverbes et particules génériques
-    "not", "no", "yes", "very", "too", "so", "also", "just", "then", "there", "here", "when", "where", "why", "how", "all", "any", "some", "such", "only"
+    "not",
+    "no",
+    "yes",
+    "very",
+    "too",
+    "so",
+    "also",
+    "just",
+    "then",
+    "there",
+    "here",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "any",
+    "some",
+    "such",
+    "only",
 }
-def custom_tokenizer(text: str, is_code: bool = False) -> list[str]:
-    # 1. Traitement spécifique pour le Code
+
+
+def custom_tokenizer(text: str, is_code: bool = False) -> List[str]:
+    """Sépare les mots de manière générique pour l'indexation."""
     sub_tokens = []
     if is_code:
-        camel_tokens = re.findall(r'[A-Z][a-z0-9]+', text)
+        camel_tokens = re.findall(r"[A-Z][a-z0-9]+", text)
         sub_tokens.extend([c.lower() for c in camel_tokens if len(c) > 2])
 
     text = text.lower()
-    tokens = re.findall(r'[a-z0-9_]+', text)
-    
+    tokens = re.findall(r"[a-z0-9_]+", text)
+
     if is_code:
         for token in tokens:
             if "_" in token:
                 sub_tokens.extend([t for t in token.split("_") if len(t) > 2])
         return tokens + sub_tokens
 
-    # On fusionne tes STOPWORDS d'origine avec les nôtres
     stop_total = set(STOPWORDS)
-    
     return [t for t in tokens if t not in stop_total]
+
 
 class SearchSystem(BaseModel):
     """System to handle BM25 index loading and metadata sequence retrieval.
@@ -48,12 +128,8 @@ class SearchSystem(BaseModel):
     This class complies with Pydantic validation rules requested
     by the project guidelines.
     """
-    # le lambda evite d'avoir des datarace sur les chemin
-    # il attend l'instanciation de la classe
-    # et cree deux objet ath different
-    storage_dir: Path = Field(
-        default_factory=lambda: Path("data/processed")
-    )
+
+    storage_dir: Path = Field(default_factory=lambda: Path("data/processed"))
     bm25_dir: Path = Field(
         default_factory=lambda: Path("data/processed/bm25_index")
     )
@@ -74,7 +150,7 @@ class SearchSystem(BaseModel):
         try:
             self.index_type_meta = index_type
             target_dir = self.storage_dir / f"bm25_index_{index_type}"
-            
+
             self.index_bm25 = bm25s.BM25().load(
                 str(target_dir), load_corpus=False
             )
@@ -83,9 +159,17 @@ class SearchSystem(BaseModel):
                 all_chunks = json.load(f)
 
             if index_type == "code":
-                self.all_chunks_raw = [c for c in all_chunks if c["source"]["file_path"].endswith(".py")]
+                self.all_chunks_raw = [
+                    c
+                    for c in all_chunks
+                    if c["source"]["file_path"].endswith(".py")
+                ]
             else:
-                self.all_chunks_raw = [c for c in all_chunks if not c["source"]["file_path"].endswith(".py")]
+                self.all_chunks_raw = [
+                    c
+                    for c in all_chunks
+                    if not c["source"]["file_path"].endswith(".py")
+                ]
 
         except (ValueError, TypeError) as e:
             print(f"Error: Cannot load index file : {e}")
@@ -95,24 +179,24 @@ class SearchSystem(BaseModel):
             sys.exit(1)
 
     def search(self, query: str, k: int = 10) -> List[MinimalSource]:
+        """Performs a query search on the specified loaded BM25 index."""
         if self.index_bm25 is None or not self.all_chunks_raw:
             self.load_index_files()
 
         try:
-            is_code_mode = (self.index_type_meta == "code")
-            
+            is_code_mode = self.index_type_meta == "code"
+
             # --- TON QUERY STRIPPING VALIDÉ ---
             if not is_code_mode:
-                # Ta liste exacte qui fait monter le Recall@1 et @3
-                question_words = {
-                    "using",
-                    "command"
-                }
-                
-                # Découpage propre en nettoyant la ponctuation autour des mots
+                question_words = {"using", "command"}
+
                 raw_words = query.lower().split()
-                cleaned_words = [w for w in raw_words if w.strip("?,.:;!") not in question_words]
-                
+                cleaned_words = [
+                    w
+                    for w in raw_words
+                    if w.strip("?,.:;!") not in question_words
+                ]
+
                 if cleaned_words:
                     query = " ".join(cleaned_words)
             # ----------------------------------
@@ -125,13 +209,21 @@ class SearchSystem(BaseModel):
             return []
 
         retrieved_sources = []
-        indices = index[0] if hasattr(index, "ndim") and index.ndim > 1 else index
+        indices = (
+            index[0]
+            if hasattr(index, "ndim") and index.ndim > 1
+            else index
+        )
         for chunk_index in indices:
             full_chunk = self.all_chunks_raw[int(chunk_index)]
             final_src = MinimalSource(
                 file_path=full_chunk["source"]["file_path"],
-                first_character_index=full_chunk["source"]["first_character_index"],
-                last_character_index=full_chunk["source"]["last_character_index"],
+                first_character_index=full_chunk["source"][
+                    "first_character_index"
+                ],
+                last_character_index=full_chunk["source"][
+                    "last_character_index"
+                ],
             )
             retrieved_sources.append(final_src)
 

@@ -2544,14 +2544,14 @@
                     "last_character_index": 20850
                 },
                 {
-                    "file_path": "data/raw/vllm-0.10.1/vllm/entrypoints/openai/serving_completion.py",
-                    "first_character_index": 18690,
-                    "last_character_index": 19960
-                },
-                {
                     "file_path": "data/raw/vllm-0.10.1/vllm/entrypoints/openai/serving_chat.py",
                     "first_character_index": 60520,
                     "last_character_index": 61790
+                },
+                {
+                    "file_path": "data/raw/vllm-0.10.1/vllm/entrypoints/openai/serving_completion.py",
+                    "first_character_index": 18690,
+                    "last_character_index": 19960
                 },
                 {
                     "file_path": "data/raw/vllm-0.10.1/vllm/entrypoints/openai/serving_chat.py",
@@ -2746,9 +2746,9 @@
                     "last_character_index": 43263
                 },
                 {
-                    "file_path": "data/raw/vllm-0.10.1/vllm/utils/__init__.py",
-                    "first_character_index": 103240,
-                    "last_character_index": 104510
+                    "file_path": "data/raw/vllm-0.10.1/vllm/entrypoints/openai/tool_parsers/utils.py",
+                    "first_character_index": 1780,
+                    "last_character_index": 3050
                 }
             ]
         },

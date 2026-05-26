@@ -1,0 +1,29 @@
+BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]                                                     Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights:  62%|██████▏   | 193/311 [00:00<00:00, 1886.51it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 1931.66it/s]
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/nbarbosa/rag/src/__main__.py", line 220, in <module>
+    main()
+    ~~~~^^
+  File "/home/nbarbosa/rag/src/__main__.py", line 216, in main
+    fire.Fire(RagCLI)
+    ~~~~~~~~~^^^^^^^^
+  File "/home/nbarbosa/rag/.venv/lib/python3.13/site-packages/fire/core.py", line 135, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/home/nbarbosa/rag/.venv/lib/python3.13/site-packages/fire/core.py", line 468, in _Fire
+    component, remaining_args = _CallAndUpdateTrace(
+                                ~~~~~~~~~~~~~~~~~~~^
+        component,
+        ^^^^^^^^^^
+    ...<2 lines>...
+        treatment='class' if is_class else 'routine',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        target=component.__name__)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nbarbosa/rag/.venv/lib/python3.13/site-packages/fire/core.py", line 684, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "/home/nbarbosa/rag/src/__main__.py", line 155, in answer
+    response = generator.generate_answer(query=query, context_chunks=contexts)
+TypeError: AnswerGenerator.generate_answer() got an unexpected keyword argument 'context_chunks'

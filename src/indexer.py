@@ -1,10 +1,10 @@
-import sys
 import json
+import sys
 from pathlib import Path
 from typing import List
 import bm25s
 from pydantic import BaseModel
-from src.models import MinimalSource, ChunkStorage
+from src.models import ChunkStorage, MinimalSource
 from src.searcher import custom_tokenizer
 
 
@@ -38,13 +38,11 @@ class CodeIndexer(BaseModel):
             sys.exit(1)
 
         # SECTORISATION CHIRURGICALE CODE VS DOC
-        # SECTORISATION CHIRURGICALE CODE VS DOC
         if path.suffix == ".py":
             les_separateurs = [""]
             overlap = 380
-            target_size = 1650 - overlap  
+            target_size = 1650 - overlap
         else:
-   
             les_separateurs = [""]
             overlap = 280
             target_size = 1855 - overlap
@@ -53,14 +51,14 @@ class CodeIndexer(BaseModel):
             text=full_data,
             max_size=target_size,
             overlap=overlap,
-            separators=les_separateurs
+            separators=les_separateurs,
         )
 
         files_sources = []
         current_search_start = 0
         for chunk in chunked_data:
             # SECURITE MOULINETTE : Hard cut à max_chunk_size
-            chunk = chunk[:self.max_chunk_size]
+            chunk = chunk[: self.max_chunk_size]
 
             # On cherche la position du morceau dans le texte complet
             start = full_data.find(chunk, current_search_start)
@@ -73,21 +71,25 @@ class CodeIndexer(BaseModel):
             source = MinimalSource(
                 file_path=str(path),
                 first_character_index=start,
-                last_character_index=end
+                last_character_index=end,
             )
-            full_info = ChunkStorage(
-                source=source,
-                text_content=chunk
-            )
+            full_info = ChunkStorage(source=source, text_content=chunk)
             files_sources.append(full_info)
 
-        print(f"Successfully created {len(chunked_data)} chunks for {path.name}")
+        print(
+            f"Successfully created {len(chunked_data)} "
+            f"chunks for {path.name}"
+        )
         return files_sources
 
     @staticmethod
-    def split_text_recursive(text: str, max_size: int, overlap: int,
-                             separators: list[str] = None) -> list[str]:
-        """Découpe un texte de manière récursive en respectant la syntaxe d'origine."""
+    def split_text_recursive(
+        text: str,
+        max_size: int,
+        overlap: int,
+        separators: List[str] = None,
+    ) -> List[str]:
+        """Découpe un texte de manière récursive en respectant la syntaxe."""
         if separators is None:
             separators = [""]
 
@@ -118,7 +120,7 @@ class CodeIndexer(BaseModel):
                     overlap_text = current_chunk[-overlap:]
                     current_chunk = (
                         overlap_text + join_str + split
-                        if len(overlap_text + join_str + split) <= max_size 
+                        if len(overlap_text + join_str + split) <= max_size
                         else split
                     )
                 else:
@@ -130,7 +132,7 @@ class CodeIndexer(BaseModel):
         return chunks
 
     def path_to_directory(self, path_dir: str) -> List[ChunkStorage]:
-        """Scans a repository to process every valid Python and Markdown file."""
+        """Scans a repository to process every valid Python and Markdown."""
         main_directory = Path(path_dir)
         all_sources = []
 
@@ -143,11 +145,13 @@ class CodeIndexer(BaseModel):
         print(f"End of indexation. Total chunks created: {len(all_sources)}")
         return all_sources
 
-    def save_index(self, all_chunk: List[ChunkStorage],
-                   destination_path: str = "data/processed") -> None:
+    def save_index(
+        self,
+        all_chunk: List[ChunkStorage],
+        destination_path: str = "data/processed",
+    ) -> None:
         """Stores BM25 statistics and raw chunk metadata onto the disk."""
         directory_path = Path(destination_path)
-        # On crée deux dossiers d'index distincts
         directory_bm25_docs = directory_path / "bm25_index_docs"
         directory_bm25_code = directory_path / "bm25_index_code"
         directory_chunks = directory_path / "chunks"
@@ -160,17 +164,21 @@ class CodeIndexer(BaseModel):
             print(f"Error: Cannot create storage directory: ({e})")
             sys.exit(1)
 
-        # On sépare les chunks par type de fichier
-        chunks_docs = [c for c in all_chunk if not c.source.file_path.endswith(".py")]
-        chunks_code = [c for c in all_chunk if c.source.file_path.endswith(".py")]
+        chunks_docs = [
+            c for c in all_chunk if not c.source.file_path.endswith(".py")
+        ]
+        chunks_code = [
+            c for c in all_chunk if c.source.file_path.endswith(".py")
+        ]
 
-        # 1. INDEXATION DES DOCS (k1=1.5, b=0.7 pour le texte naturel)
         # 1. INDEXATION DES DOCS
         if chunks_docs:
             try:
                 index_docs = bm25s.BM25(k1=2, b=0.83)
                 texts_docs = [c.text_content for c in chunks_docs]
-                tokens_docs = [custom_tokenizer(t, is_code=False) for t in texts_docs]
+                tokens_docs = [
+                    custom_tokenizer(t, is_code=False) for t in texts_docs
+                ]
                 index_docs.index(tokens_docs)
                 index_docs.save(str(directory_bm25_docs), corpus=texts_docs)
             except (OSError, PermissionError, ValueError, TypeError) as e:
@@ -181,7 +189,9 @@ class CodeIndexer(BaseModel):
             try:
                 index_code = bm25s.BM25(k1=1.5, b=0.7)
                 texts_code = [c.text_content for c in chunks_code]
-                tokens_code = [custom_tokenizer(t, is_code=True) for t in texts_code]
+                tokens_code = [
+                    custom_tokenizer(t, is_code=True) for t in texts_code
+                ]
                 index_code.index(tokens_code)
                 index_code.save(str(directory_bm25_code), corpus=texts_code)
             except (OSError, PermissionError, ValueError, TypeError) as e:
