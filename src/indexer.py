@@ -44,7 +44,7 @@ class CodeIndexer(BaseModel):
             overlap = 380
             target_size = 1650 - overlap  
         else:
-            
+   
             les_separateurs = [""]
             overlap = 280
             target_size = 1855 - overlap
@@ -67,7 +67,7 @@ class CodeIndexer(BaseModel):
             if start == -1:
                 start = full_data.find(chunk)
             end = start + len(chunk)
-            
+
             current_search_start = start + max(1, len(chunk) - overlap)
 
             source = MinimalSource(
@@ -89,7 +89,7 @@ class CodeIndexer(BaseModel):
                              separators: list[str] = None) -> list[str]:
         """Découpe un texte de manière récursive en respectant la syntaxe d'origine."""
         if separators is None:
-            separators = ["\n\n", "\n", " ", ""]
+            separators = ["\n\n", "\n", ""]
 
         if len(text) <= max_size:
             return [text]

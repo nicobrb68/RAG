@@ -8,8 +8,19 @@ from src.models import MinimalSource
 import re
 
 # Liste des mots vides anglais les plus fréquents qui parasitent le BM25 dans la doc
-STOPWORDS = {"the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "of", "to", "in", "for", "with", "on", "at", "by", "from", "this", "that", "it", "you", "your"}
-
+STOPWORDS = {
+    # Pronoms et déterminants
+    "the", "a", "an", "this", "that", "these", "those", "it", "its", "my", "your", "his", "her", "their", "our", "you", "i", "he", "she", "we", "they", "me", "him", "them",
+    
+    # Prépositions et connecteurs logiques
+    "and", "or", "but", "of", "to", "in", "for", "with", "on", "at", "by", "from", "as", "into", "through", "during", "after", "before", "over", "under", "about",
+    
+    # Auxiliaires et verbes d'état fréquents
+    "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "can", "could", "should", "would", "will", "may", "might", "must",
+    
+    # Adverbes et particules génériques
+    "not", "no", "yes", "very", "too", "so", "also", "just", "then", "there", "here", "when", "where", "why", "how", "all", "any", "some", "such", "only"
+}
 def custom_tokenizer(text: str, is_code: bool = False) -> list[str]:
     # 1. Traitement spécifique pour le Code
     sub_tokens = []
@@ -96,6 +107,26 @@ class SearchSystem(BaseModel):
 
         try:
             is_code_mode = (self.index_type_meta == "code")
+            
+            # --- QUERY STRIPPING UNIQUEMENT POUR LA DOC ---
+            if not is_code_mode:
+                # On retire les verbes et tournures de questions courantes qui polluent le score
+                question_words = {
+                     "using", "use", "does", "do", "can", "should", 
+                    "must", "be", "command",
+                    "happen", "happens",
+                }
+                
+                # Extraction des mots de la query en minuscules
+                raw_words = query.lower().split()
+                # On ne garde que ce qui n'est pas dans les mots de question
+                cleaned_query = " ".join([w for w in raw_words if w.strip("?,.:;!") not in question_words])
+                
+                # Si le nettoyage n'a pas vidé la requête, on utilise la version propre
+                if cleaned_query.strip():
+                    query = cleaned_query
+            # ----------------------------------------------
+
             tokens = custom_tokenizer(query, is_code=is_code_mode)
             batch_tokens = [tokens]
             index, scores = self.index_bm25.retrieve(batch_tokens, k=k)
