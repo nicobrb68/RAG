@@ -159,7 +159,7 @@ class RagCLI:
     def answer_dataset(
         self,
         dataset_path: str,
-        k: int = 5,
+        k: int = 2,
         save_directory: str = "data/output/generation_results",
     ) -> None:
         """Processes a complete dataset to generate text answers."""
@@ -170,9 +170,11 @@ class RagCLI:
 
         target_index = "code" if "code" in dataset_path.lower() else "docs"
         searcher.load_index_files(index_type=target_index)
-
-        with open(dataset_path, "r", encoding="utf-8") as f:
-            dataset = json.load(f).get("rag_questions", [])
+        try:
+            with open(dataset_path, "r", encoding="utf-8") as f:
+                dataset = json.load(f).get("rag_questions", [])
+        except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
+            print(f"Error with dataset file : {e}")
 
         generation_results_list = []
         for item in dataset:
@@ -189,7 +191,7 @@ class RagCLI:
             ]
 
             answer_text = generator.generate_answer(
-                question=query_text, contexts=contexts
+                query=query_text, contexts=contexts
             )
 
             generation_results_list.append(

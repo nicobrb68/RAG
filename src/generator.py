@@ -58,11 +58,10 @@ class AnswerGenerator(BaseModel):
 
             # Raccourci drastique du contexte pour éviter de noyer Qwen3-0.6B
             context_str = full_context[:1200]
-            
+
             # Prompt direct sans Chat Template (les petits modèles se perdent dedans)
             text = (
                 f"Task: Extract the exact technical terms from the context "
-                f"to answer the question.\n"
                 f"Context:\n{context_str}\n\n"
                 f"Question: {query}\n"
                 f"Direct Technical Answer:"
