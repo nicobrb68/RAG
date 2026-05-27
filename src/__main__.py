@@ -152,32 +152,37 @@ class RagCLI:
                     contexts.append(chunk["text_content"])
 
         generator = AnswerGenerator(model_name="Qwen/Qwen3-0.6B")
-        response = generator.generate_answer(query=query, contexts=contexts)
+        response = generator.generate_answer(question=query, contexts=contexts)
 
         print(response)
 
     def answer_dataset(
         self,
         dataset_path: str,
-        k: int = 2,
+        k: int = 3,
         save_directory: str = "data/output/generation_results",
     ) -> None:
         """Processes a complete dataset to generate text answers."""
         from src.generator import AnswerGenerator
+        from tqdm import tqdm
 
         searcher = SearchSystem()
         generator = AnswerGenerator()
 
         target_index = "code" if "code" in dataset_path.lower() else "docs"
         searcher.load_index_files(index_type=target_index)
+
         try:
             with open(dataset_path, "r", encoding="utf-8") as f:
                 dataset = json.load(f).get("rag_questions", [])
         except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
             print(f"Error with dataset file : {e}")
+            return
 
         generation_results_list = []
-        for item in dataset:
+
+        # Boucle principale avec la barre de progression tqdm
+        for item in tqdm(dataset, desc="Génération des réponses RAG"):
             query_text = item["question"]
             sources = searcher.search(query=query_text, k=k)
 
@@ -191,9 +196,10 @@ class RagCLI:
             ]
 
             answer_text = generator.generate_answer(
-                query=query_text, contexts=contexts
+                question=query_text, contexts=contexts
             )
 
+            # Nettoyage strict : uniquement les clés nécessaires
             generation_results_list.append(
                 {
                     "question_id": item.get("question_id"),
@@ -206,11 +212,17 @@ class RagCLI:
         out_dir.mkdir(parents=True, exist_ok=True)
         output_file = out_dir / f"{Path(dataset_path).stem}_answers.json"
 
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(
-                {"generation_results": generation_results_list}, f, indent=4
-            )
-        print(f"Results saved to {output_file}")
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"generation_results": generation_results_list},
+                    f,
+                    indent=4,
+                )
+        except (PermissionError, FileNotFoundError, OSError) as e:
+            print(f"Error while saving result: {e}")
+
+        print(f"\nResults saved to {output_file}")
 
 
 def main() -> None:
