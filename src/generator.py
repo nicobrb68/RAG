@@ -11,7 +11,7 @@ class AnswerGenerator(BaseModel):
 
     model_dir: str = "data/models"
     model_name: str = "qwen3-0.6b.gguf"
-    max_new_tokens: int = 400
+    max_new_tokens: int = 380
     max_context_chars: int = 4500
     llm: Any = Field(default=None, exclude=True)
 

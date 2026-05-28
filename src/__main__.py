@@ -124,36 +124,31 @@ class RagCLI:
             print(f"Error: Failed to save results to disk. Details: {e}")
 
     def answer(self, query: str, k: int = 5) -> None:
-        """Answers a single query using the complete RAG pipeline."""
+        """Answers a single query by searching both code and docs indexes."""
         from src.generator import AnswerGenerator
 
         searcher = SearchSystem()
-
-        target_index = (
-            "code"
-            if any(
-                x in query.lower()
-                for x in [".py", "def ", "class ", "_"]
-            )
-            else "docs"
-        )
-        searcher.load_index_files(index_type=target_index)
-
-        sources = searcher.search(query=query, k=k)
-
         contexts = []
-        for src in sources:
-            for chunk in searcher.all_chunks_raw:
-                if (
-                    chunk["source"]["file_path"] == src.file_path
-                    and chunk["source"]["first_character_index"]
-                    == src.first_character_index
-                ):
-                    contexts.append(chunk["text_content"])
 
-        generator = AnswerGenerator(model_name="Qwen/Qwen3-0.6B")
+        # On parcourt les deux index l'un après l'autre pour fusionner les sources
+        for index_type in ["code", "docs"]:
+            try:
+                searcher.load_index_files(index_type=index_type)
+                sources = searcher.search(query=query, k=k)
+                
+                for src in sources:
+                    for chunk in searcher.all_chunks_raw:
+                        if (
+                            chunk["source"]["file_path"] == src.file_path
+                            and chunk["source"]["first_character_index"] == src.first_character_index
+                        ):
+                            contexts.append(chunk["text_content"])
+            except Exception:
+                continue
+
+        # Inférence avec le contexte global combiné
+        generator = AnswerGenerator()
         response = generator.generate_answer(question=query, contexts=contexts)
-
         print(response)
 
     def answer_dataset(
@@ -162,7 +157,7 @@ class RagCLI:
         k: int = 3,
         save_directory: str = "data/output/generation_results",
     ) -> None:
-        """Processes a complete dataset to generate text answers sequentially."""
+        """Processes a complete dataset by searching both code and docs indexes."""
         import json
         from pathlib import Path
         from src.generator import AnswerGenerator
@@ -170,9 +165,6 @@ class RagCLI:
 
         searcher = SearchSystem()
         generator = AnswerGenerator()
-
-        target_index = "code" if "code" in dataset_path.lower() else "docs"
-        searcher.load_index_files(index_type=target_index)
 
         try:
             with open(dataset_path, "r", encoding="utf-8") as f:
@@ -183,19 +175,25 @@ class RagCLI:
 
         generation_results_list = []
 
-        # Boucle stable question par question
         for item in tqdm(dataset, desc="Génération des réponses RAG"):
             query_text = item["question"]
-            sources = searcher.search(query=query_text, k=k)
+            contexts = []
 
-            contexts = [
-                c["text_content"]
-                for c in searcher.all_chunks_raw
-                for src in sources
-                if c["source"]["file_path"] == src.file_path
-                and c["source"]["first_character_index"]
-                == src.first_character_index
-            ]
+            # Recherche globale sur le code ET les docs pour chaque question du dataset
+            for index_type in ["code", "docs"]:
+                try:
+                    searcher.load_index_files(index_type=index_type)
+                    sources = searcher.search(query=query_text, k=k)
+                    
+                    for src in sources:
+                        for chunk in searcher.all_chunks_raw:
+                            if (
+                                chunk["source"]["file_path"] == src.file_path
+                                and chunk["source"]["first_character_index"] == src.first_character_index
+                            ):
+                                contexts.append(chunk["text_content"])
+                except Exception:
+                    continue
 
             answer_text = generator.generate_answer(
                 question=query_text, contexts=contexts
@@ -224,7 +222,6 @@ class RagCLI:
             print(f"Error while saving result: {e}")
 
         print(f"\nResults saved to {output_file}")
-
 
 def main() -> None:
     """Main entry point for Python Fire."""
