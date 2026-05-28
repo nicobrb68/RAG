@@ -162,7 +162,9 @@ class RagCLI:
         k: int = 3,
         save_directory: str = "data/output/generation_results",
     ) -> None:
-        """Processes a complete dataset to generate text answers."""
+        """Processes a complete dataset to generate text answers sequentially."""
+        import json
+        from pathlib import Path
         from src.generator import AnswerGenerator
         from tqdm import tqdm
 
@@ -181,7 +183,7 @@ class RagCLI:
 
         generation_results_list = []
 
-        # Boucle principale avec la barre de progression tqdm
+        # Boucle stable question par question
         for item in tqdm(dataset, desc="Génération des réponses RAG"):
             query_text = item["question"]
             sources = searcher.search(query=query_text, k=k)
@@ -199,7 +201,6 @@ class RagCLI:
                 question=query_text, contexts=contexts
             )
 
-            # Nettoyage strict : uniquement les clés nécessaires
             generation_results_list.append(
                 {
                     "question_id": item.get("question_id"),

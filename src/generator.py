@@ -1,17 +1,17 @@
+import re
 import sys
 from typing import Any, List
-import torch
+from llama_cpp import Llama
 from pydantic import BaseModel, Field
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 class AnswerGenerator(BaseModel):
-    """LLM-based generator for context-aware answers optimized for CPU."""
+    """Loads Qwen3-0.6B via llama.cpp for ultra-fast CPU inference."""
 
-    model_name: str = "Qwen/Qwen3-0.6B"
-    device: str = "cpu"
-    tokenizer: Any = Field(default=None, exclude=True)
-    model: Any = Field(default=None, exclude=True)
+    model_path: str = "data/models/qwen3-0.6b.gguf"
+    max_new_tokens: int = 512  # La limite haute de ton pote
+    max_context_chars: int = 6000
+    llm: Any = Field(default=None, exclude=True)
 
     class Config:
         """Pydantic configuration to allow arbitrary object types."""
@@ -19,125 +19,82 @@ class AnswerGenerator(BaseModel):
         arbitrary_types_allowed = True
 
     def model_post_init(self, __context: Any) -> None:
-        """Initialize the model and tokenizer after Pydantic validation."""
+        """Initialize the native C++ Llama engine after validation."""
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                device_map="cpu",
-                torch_dtype=torch.float32,
-                low_cpu_mem_usage=True,
+            # Charge le modèle GGUF instantanément en mémoire CPU
+            self.llm = Llama(
+                model_path=self.model_path,
+                n_ctx=4096,     # Assez grand pour encaisser la doc
+                n_threads=4,    # Monte à 6 ou 8 si tu as un gros processeur
+                verbose=False,
             )
-        except OSError as e:
+        except Exception as e:
             print(
-                f"RuntimeError: Failed to load model '{self.model_name}'. "
+                f"RuntimeError: Failed to load Llama-CPP model. "
                 f"Details: {e}",
                 file=sys.stderr,
             )
 
-        if self.tokenizer:
-            self.tokenizer.padding_side = "left"
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-
     def generate_answer(self, question: str, contexts: List[str]) -> str:
-        """Generate an answer for a single query by leveraging batching."""
-        answers = self.generate_answers_batch([question], [contexts])
-        return answers[0] if answers else "Information not found"
+        """Let the AI reason and extract the technical answer using C++."""
+        if not self.llm or not contexts:
+            return "Information not found."
+
+        # Reconstruction du contexte à la lettre comme ton pote
+        context_parts = []
+        total_chars = 0
+        for chunk_text in contexts:
+            if not chunk_text:
+                continue
+            if total_chars + len(chunk_text) > self.max_context_chars:
+                break
+            context_parts.append(f"Source: chunk\n{chunk_text}")
+            total_chars += len(chunk_text)
+
+        context = "\n\n---\n\n".join(context_parts)
+
+        # Structure de messages de ton pote
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful assistant answering questions about "
+                    "the vLLM codebase. Answer based ONLY on the provided "
+                    "sources. Be concise and self-contained. Mention the "
+                    "source file(s) you draw from."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Sources:\n{context}\n\nQuestion: {question}",
+            },
+        ]
+
+        try:
+            # Inférence native en C++ (vitesse maximale sur CPU)
+            response = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=self.max_new_tokens,
+                temperature=0.0,
+                repeat_penalty=1.3,  # La pénalité anti-boucle de ton pote
+            )
+            
+            answer = response["choices"][0]["message"]["content"].strip()
+            
+            # Nettoyage regex strict des balises de réflexion de ton pote
+            answer = re.sub(
+                r"<think>.*?</think>", "", answer, flags=re.DOTALL
+            ).strip()
+            
+            return answer if answer else "Information not found."
+            
+        except Exception:
+            return "Information not found."
 
     def generate_answers_batch(
         self, queries: List[str], contexts_list: List[List[str]]
     ) -> List[str]:
-        """Generate answers for a batch of queries simultaneously for CPU."""
-        if not queries or self.model is None or self.tokenizer is None:
-            return []
-
-        formatted_prompts = []
-        for query, context_chunks in zip(queries, contexts_list):
-            cleaned_chunks = [c.strip() for c in context_chunks if c.strip()]
-            context_str = " ".join(cleaned_chunks)[:700]
-
-            # Application des consignes du pote au format "Modèle Base"
-            text = (
-                f"Instructions: Answer the question using only the facts "
-                f"from the document. Be direct, faithful and relevant.\n\n"
-                f"Document:\n{context_str}\n\n"
-                f"Question: {query.strip(' ?')}\n"
-                f"Answer: According to vLLM documentation, the exact "
-                f"technical solution is"
-            )
-            formatted_prompts.append(text)
-
-        model_inputs = self.tokenizer(
-            formatted_prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=1200,
-        ).to(self.device)
-
-        with torch.no_grad():
-            generated_ids = self.model.generate(
-                input_ids=model_inputs["input_ids"],
-                attention_mask=model_inputs.get("attention_mask"),
-                max_new_tokens=35,
-                do_sample=False,
-                use_cache=True,
-                pad_token_id=self.tokenizer.eos_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-            )
-
-        new_generated_ids = [
-            output_ids[len(input_ids) :]
-            for input_ids, output_ids in zip(
-                model_inputs.input_ids, generated_ids
-            )
+        """Process queries sequentially using the fast native C++ engine."""
+        return [
+            self.generate_answer(q, c) for q, c in zip(queries, contexts_list)
         ]
-
-        decoded_outputs = self.tokenizer.batch_decode(
-            new_generated_ids, skip_special_tokens=True
-        )
-
-        processed_answers = []
-        for output, query, context_chunks in zip(
-            decoded_outputs, queries, contexts_list
-        ):
-            ans = output.strip().split("\n")[0].strip()
-            
-            # Ne coupe pas les versions décimales comme 3.9
-            if ". " in ans:
-                ans = ans.split(". ")[0].strip()
-
-            bad_patterns = [
-                "[list", "___", "__", "{", "}", "put the answer", 
-                "box", "href", "insert your answer", "[blank]", "above"
-            ]
-
-            # Fallback rigoureux par extraction si le modèle déraille
-            if (
-                not ans
-                or len(ans) < 3
-                or any(pat in ans.lower() for pat in bad_patterns)
-            ):
-                keywords = [
-                    w.strip("?,.!") for w in query.lower().split() if len(w) > 4
-                ]
-                extracted = ""
-                for sentence in " ".join(context_chunks).split(". "):
-                    if len(sentence.strip()) > 25 and any(
-                        k in sentence.lower() for k in keywords
-                    ):
-                        extracted = sentence.strip()
-                        break
-                ans = extracted if extracted else "Information not found"
-
-            prefix = "According to vLLM documentation, the exact technical solution is "
-            if not ans.lower().startswith("according"):
-                ans = prefix + ans[:1].lower() + ans[1:]
-
-            if ans and not ans.endswith("."):
-                ans += "."
-
-            processed_answers.append(" ".join(ans.split()))
-
-        return processed_answers
