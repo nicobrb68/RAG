@@ -12,7 +12,7 @@ class AnswerGenerator(BaseModel):
     model_dir: str = "data/models"
     model_name: str = "qwen3-0.6b.gguf"
     max_new_tokens: int = 400
-    max_context_chars: int = 5000
+    max_context_chars: int = 4500
     llm: Any = Field(default=None, exclude=True)
 
     class Config:
@@ -55,6 +55,7 @@ class AnswerGenerator(BaseModel):
                 model_path=self.model_path,
                 n_ctx=4096,
                 n_threads=4,
+                flash_attn=True,
                 verbose=False,
             )
         except Exception as e:
@@ -94,6 +95,7 @@ class AnswerGenerator(BaseModel):
                 max_tokens=self.max_new_tokens,
                 temperature=0.0,
                 repeat_penalty=1.3,
+                #cache_prompt=True,
             )
             
             answer = response["choices"][0]["message"]["content"].strip()

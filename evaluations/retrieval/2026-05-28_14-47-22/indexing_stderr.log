@@ -1,0 +1,37 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/nbarbosa/rag/src/__main__.py", line 235, in <module>
+    main()
+    ~~~~^^
+  File "/home/nbarbosa/rag/src/__main__.py", line 231, in main
+    fire.Fire(RagCLI)
+    ~~~~~~~~~^^^^^^^^
+  File "/home/nbarbosa/rag/.venv/lib/python3.13/site-packages/fire/core.py", line 135, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/home/nbarbosa/rag/.venv/lib/python3.13/site-packages/fire/core.py", line 468, in _Fire
+    component, remaining_args = _CallAndUpdateTrace(
+                                ~~~~~~~~~~~~~~~~~~~^
+        component,
+        ^^^^^^^^^^
+    ...<2 lines>...
+        treatment='class' if is_class else 'routine',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        target=component.__name__)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nbarbosa/rag/.venv/lib/python3.13/site-packages/fire/core.py", line 684, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "/home/nbarbosa/rag/src/__main__.py", line 19, in index
+    chunks = indexer.path_to_directory("data/raw/vllm-0.10.1")
+  File "/home/nbarbosa/rag/src/indexer.py", line 142, in path_to_directory
+    source_files = self._read_then_chunk(file_path)
+  File "/home/nbarbosa/rag/src/indexer.py", line 50, in _read_then_chunk
+    chunked_data = CodeIndexer.split_text_recursive(
+        text=full_data,
+    ...<2 lines>...
+        separators=les_separateurs,
+    )
+  File "/home/nbarbosa/rag/src/indexer.py", line 114, in split_text_recursive
+    current_chunk = potential_chunk
+    ^^^^^^^^^^^^^
+KeyboardInterrupt
