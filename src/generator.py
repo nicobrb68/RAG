@@ -96,7 +96,7 @@ class AnswerGenerator(BaseModel):
         try:
             # Typage explicite du dictionnaire de retour de llama_cpp
             response: Dict[str, Any] = self.llm.create_chat_completion(
-                messages=messages,  # type: ignore[arg-type]
+                messages=messages,
                 max_tokens=self.max_new_tokens,
                 temperature=0.0,
                 repeat_penalty=1.3,

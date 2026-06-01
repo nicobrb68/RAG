@@ -1,81 +1,44 @@
-# ==============================================================================
-# CONFIGURATION ET CHEMINS
-# ==============================================================================
-MOULINETTE = ./moulinette/moulinette-ubuntu
-RESULT_JSON = data/output/search_results/generated_search_results.json
 
-DS_DOCS_UNANSWERED = datasets_public/public/UnansweredQuestions/dataset_docs_public.json
-DS_DOCS_ANSWERED   = datasets_public/public/AnsweredQuestions/dataset_docs_public.json
 
-DS_CODE_UNANSWERED = datasets_public/public/UnansweredQuestions/dataset_code_public.json
-DS_CODE_ANSWERED   = datasets_public/public/AnsweredQuestions/dataset_code_public.json
+.PHONY: install run debug clean lint lint-strict
 
-# Paramètres imposés par la moulinette
-K = 5
-MAX_LENGTH = 2000
-THRESHOLD = 0.5
 
-# Couleurs pour l'affichage de la console
-GREEN  = \033[1;32m
-YELLOW = \033[1;33m
-RED    = \033[1;31m
-BLUE   = \033[1;34m
-RESET  = \033[0m
+MODULE_NAME = src
 
-.PHONY: all clean index test-docs test-code test-all help
 
-# ==============================================================================
-# COMMANDES PRINCIPALES
-# ==============================================================================
+install:
+	@echo "Installing dependencies with uv..."
+	uv pip install -r pyproject.toml
 
-help:
-	@echo "$(BLUE)=== RAG AUTOMATION SYSTEM ===$(RESET)"
-	@echo "Commandes disponibles :"
-	@echo "  make index      - Supprime les anciens index et reconstruit la base BM25"
-	@echo "  make test-docs  - Cherche et évalue le dataset de DOCUMENTATION"
-	@echo "  make test-code  - Cherche et évalue le dataset de CODE SOURCE"
-	@echo "  make test-all   - Exécute l'indexation complète et lance les deux tests à la suite"
-	@echo "  make clean      - Nettoie les fichiers d'indexation et les résultats générés"
+
+run:
+	@echo "Running the RAG CLI application..."
+	uv run python -m $(MODULE_NAME) --help
+
+
+debug:
+	@echo "Launching RAG CLI in debug mode (pdb)..."
+	uv run python -m pdb -m $(MODULE_NAME)
+
 
 clean:
-	@echo "$(YELLOW) Nettoyage des anciennes données d'index et résultats...$(RESET)"
-	rm -rf data/processed/bm25_index
-	rm -rf data/processed/chunks
-	rm -f $(RESULT_JSON)
-	rm -f data/output/search_results/*_results.json
-	@echo "$(GREEN) Nettoyage terminé !$(RESET)"
+	@echo "Cleaning up caches and temporary files..."
+	rm -rf .mypy_cache .pytest_cache .ruff_cache
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+	find . -type f -name "*.pyo" -delete
 
-index: clean
-	@echo "$(BLUE) Extraction et indexation du jeu de données brut...$(RESET)"
-	uv run python -m src index
+lint:
+	@echo "Running mandatory Flake8 and Mypy checks..."
+	uv run flake8 $(MODULE_NAME)
+	uv run mypy --warn-return-any \
+		--warn-unused-ignores \
+		--ignore-missing-imports \
+		--disallow-untyped-defs \
+		--check-untyped-defs \
+		$(MODULE_NAME)
 
-test-docs:
-	@echo "\n$(BLUE)============== TEST DATASET : DOCUMENTATION ==============$(RESET)"
-	@echo "$(YELLOW)1. Exécution de la recherche sur les questions Docs...$(RESET)"
-	uv run python -m src search_dataset $(DS_DOCS_UNANSWERED) --k $(K)
-	@echo "$(YELLOW)[HACK OPTION C] Préparation du fichier pour la moulinette...$(RESET)"
-	cp data/output/search_results/dataset_docs_public_results.json $(RESULT_JSON)
-	@echo "$(YELLOW)2. Lancement de l'évaluation par la moulinette...$(RESET)"
-	$(MOULINETTE) evaluate_student_search_results \
-		$(RESULT_JSON) \
-		$(DS_DOCS_ANSWERED) \
-		--k $(K) \
-		--max_context_length $(MAX_LENGTH) \
-		--threshold $(THRESHOLD)
-
-test-code:
-	@echo "\n$(BLUE)============== TEST DATASET : CODE SOURCE ==============$(RESET)"
-	@echo "$(YELLOW)1. Exécution de la recherche sur les questions Code...$(RESET)"
-	uv run python -m src search_dataset $(DS_CODE_UNANSWERED) --k $(K)
-	@echo "$(YELLOW)[HACK OPTION C] Préparation du fichier pour la moulinette...$(RESET)"
-	cp data/output/search_results/dataset_code_public_results.json $(RESULT_JSON)
-	@echo "$(YELLOW)2. Lancement de l'évaluation par la moulinette...$(RESET)"
-	$(MOULINETTE) evaluate_student_search_results \
-		$(RESULT_JSON) \
-		$(DS_CODE_ANSWERED) \
-		--k $(K) \
-		--max_context_length $(MAX_LENGTH) \
-		--threshold $(THRESHOLD)
-
-test-all: index test-docs test-code
-	@echo "\n$(GREEN) Pipeline complet exécuté avec succès ! Vérifie tes scores ci-dessus.$(RESET)"
+lint-strict:
+	@echo "Running strict quality checks..."
+	uv run flake8 $(MODULE_NAME)
+	uv run mypy $(MODULE_NAME)

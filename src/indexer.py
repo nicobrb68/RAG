@@ -1,7 +1,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Dict, Any
 import bm25s
 from pydantic import BaseModel
 from src.models import ChunkStorage, MinimalSource
@@ -57,7 +57,6 @@ class CodeIndexer(BaseModel):
         files_sources = []
         current_search_start = 0
         for chunk in chunked_data:
-            # SECURITE MOULINETTE : Hard cut à max_chunk_size
             chunk = chunk[: self.max_chunk_size]
 
             # On cherche la position du morceau dans le texte complet
@@ -87,7 +86,7 @@ class CodeIndexer(BaseModel):
         text: str,
         max_size: int,
         overlap: int,
-        separators: List[str] = None,
+        separators: Optional[List[str]] = None,
     ) -> List[str]:
         """Découpe un texte de manière récursive en respectant la syntaxe."""
         if separators is None:
@@ -171,7 +170,7 @@ class CodeIndexer(BaseModel):
             c for c in all_chunk if c.source.file_path.endswith(".py")
         ]
 
-        # 1. INDEXATION DES DOCS
+        # Index docs
         if chunks_docs:
             try:
                 index_docs = bm25s.BM25(k1=2, b=0.83)
@@ -184,7 +183,7 @@ class CodeIndexer(BaseModel):
             except (OSError, PermissionError, ValueError, TypeError) as e:
                 print(f"Error: BM25 docs indexing failed ({e})")
 
-        # 2. INDEXATION DU CODE
+        # index code
         if chunks_code:
             try:
                 index_code = bm25s.BM25(k1=1.5, b=0.7)
@@ -198,7 +197,9 @@ class CodeIndexer(BaseModel):
                 print(f"Error: BM25 code indexing failed ({e})")
 
         try:
-            list_json: List[dict] = [chunk.model_dump() for chunk in all_chunk]
+            list_json: List[Dict[str, Any]] = (
+                                               [chunk.model_dump()
+                                                for chunk in all_chunk])
             json_file = directory_chunks / "chunks_data.json"
 
             with open(json_file, "w", encoding="utf-8") as f:

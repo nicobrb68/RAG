@@ -199,7 +199,6 @@ class SearchSystem(BaseModel):
 
                 if cleaned_words:
                     query = " ".join(cleaned_words)
-            # ----------------------------------
 
             tokens = custom_tokenizer(query, is_code=is_code_mode)
             batch_tokens = [tokens]
