@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 from llama_cpp import Llama
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,7 @@ class AnswerGenerator(BaseModel):
     model_name: str = "qwen3-0.6b.gguf"
     max_new_tokens: int = 380
     max_context_chars: int = 4500
-    llm: Any = Field(default=None, exclude=True)
+    llm: Optional[Llama] = Field(default=None, exclude=True)
 
     class Config:
         """Pydantic configuration to allow arbitrary object types."""
@@ -37,6 +37,7 @@ class AnswerGenerator(BaseModel):
             )
             try:
                 import urllib.request
+
                 url = (
                     "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/"
                     "resolve/main/qwen1_5-0_5b-chat-q4_k_m.gguf"
@@ -65,14 +66,18 @@ class AnswerGenerator(BaseModel):
             )
 
     def generate_answer(self, question: str, contexts: List[str]) -> str:
-        """Generate an answer letting the AI fully express itself without stops."""
+        """Generate an answer letting the AI fully express itself."""
         if not self.llm or not contexts:
             return "Information not found."
 
-        context_parts = [f"Source: chunk\n{c.strip()}" for c in contexts if c.strip()]
-        context = "\n\n---\n\n".join(context_parts)[:self.max_context_chars]
+        context_parts: List[str] = [
+            f"Source: chunk\n{c.strip()}" for c in contexts if c.strip()
+        ]
+        context: str = "\n\n---\n\n".join(context_parts)[
+            : self.max_context_chars
+        ]
 
-        messages = [
+        messages: List[Dict[str, str]] = [
             {
                 "role": "system",
                 "content": (
@@ -89,35 +94,39 @@ class AnswerGenerator(BaseModel):
         ]
 
         try:
-            # Code épuré : aucun paramètre "stop" customisé qui vient brider l'IA
-            response = self.llm.create_chat_completion(
-                messages=messages,
+            # Typage explicite du dictionnaire de retour de llama_cpp
+            response: Dict[str, Any] = self.llm.create_chat_completion(
+                messages=messages,  # type: ignore[arg-type]
                 max_tokens=self.max_new_tokens,
                 temperature=0.0,
                 repeat_penalty=1.3,
-                #cache_prompt=True,
             )
-            
-            answer = response["choices"][0]["message"]["content"].strip()
-            
+
+            answer: str = response["choices"][0]["message"]["content"].strip()
+
             # On enlève juste la chaîne de pensée interne
-            answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
-            
+            answer = re.sub(
+                r"<think>.*?</think>", "", answer, flags=re.DOTALL
+            ).strip()
+
             # Nettoyage minimal des caractères bizarres et espaces
             answer = re.sub(r"[^\x00-\x7F]+", "", answer).strip()
             answer = answer.strip(':,.-"\' `')
-            
+
             if answer:
                 answer = answer[:1].upper() + answer[1:]
                 if not answer.endswith("."):
-                    ans_lower = answer.lower()
-                    if not (ans_lower.endswith(("=", "-", "_")) or ans_lower.split()[-1].startswith("-")):
+                    ans_lower: str = answer.lower()
+                    if not (
+                        ans_lower.endswith(("=", "-", "_"))
+                        or ans_lower.split()[-1].startswith("-")
+                    ):
                         answer += "."
             else:
                 answer = "Information not found."
 
             return answer
-            
+
         except Exception:
             return "Information not found."
 

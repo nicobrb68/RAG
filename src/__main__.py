@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any, Dict, List
 import fire
 from src.indexer import CodeIndexer
 from src.searcher import SearchSystem
@@ -60,7 +61,7 @@ class RagCLI:
         try:
             with open(dataset_path, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
-                dataset = (
+                dataset: Any = (
                     raw_data.get("rag_questions", raw_data)
                     if isinstance(raw_data, dict)
                     else raw_data
@@ -75,15 +76,15 @@ class RagCLI:
             print(f"Unexpected error while reading dataset: {e}")
             return
 
-        search_results_list = []
+        search_results_list: List[Dict[str, Any]] = []
 
         for i, item in enumerate(dataset):
             try:
                 if not isinstance(item, dict) or "question" not in item:
                     raise KeyError("Missing or invalid 'question' key.")
 
-                query_text = item["question"]
-                q_id = item.get("question_id", f"q_{i}")
+                query_text: str = item["question"]
+                q_id: str = item.get("question_id", f"q_{i}")
 
                 sources = searcher.search(query=query_text, k=k)
 
@@ -124,29 +125,28 @@ class RagCLI:
             print(f"Error: Failed to save results to disk. Details: {e}")
 
     def answer(self, query: str, k: int = 5) -> None:
-        """Answers a single query by searching both code and docs indexes."""
+        """Answers a single query by searching both code and docs."""
         from src.generator import AnswerGenerator
 
         searcher = SearchSystem()
-        contexts = []
+        contexts: List[str] = []
 
-        # On parcourt les deux index l'un après l'autre pour fusionner les sources
         for index_type in ["code", "docs"]:
             try:
                 searcher.load_index_files(index_type=index_type)
                 sources = searcher.search(query=query, k=k)
-                
+
                 for src in sources:
                     for chunk in searcher.all_chunks_raw:
                         if (
                             chunk["source"]["file_path"] == src.file_path
-                            and chunk["source"]["first_character_index"] == src.first_character_index
+                            and chunk["source"]["first_character_index"]
+                            == src.first_character_index
                         ):
                             contexts.append(chunk["text_content"])
             except Exception:
                 continue
 
-        # Inférence avec le contexte global combiné
         generator = AnswerGenerator()
         response = generator.generate_answer(question=query, contexts=contexts)
         print(response)
@@ -154,12 +154,10 @@ class RagCLI:
     def answer_dataset(
         self,
         dataset_path: str,
-        k: int = 3,
+        k: int = 5,
         save_directory: str = "data/output/generation_results",
     ) -> None:
-        """Processes a complete dataset by searching both code and docs indexes."""
-        import json
-        from pathlib import Path
+        """Processes a dataset by searching both code and docs indexes."""
         from src.generator import AnswerGenerator
         from tqdm import tqdm
 
@@ -168,28 +166,33 @@ class RagCLI:
 
         try:
             with open(dataset_path, "r", encoding="utf-8") as f:
-                dataset = json.load(f).get("rag_questions", [])
-        except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
+                raw_json: Dict[str, Any] = json.load(f)
+                dataset: List[Dict[str, Any]] = raw_json.get(
+                    "rag_questions", []
+                )
+        except (PermissionError, FileNotFoundError, OSError) as e:
             print(f"Error with dataset file : {e}")
             return
 
-        generation_results_list = []
+        generation_results_list: List[Dict[str, Any]] = []
 
         for item in tqdm(dataset, desc="Génération des réponses RAG"):
-            query_text = item["question"]
-            contexts = []
+            query_text: str = item["question"]
+            contexts: List[str] = []
+            last_sources: List[Any] = []
 
-            # Recherche globale sur le code ET les docs pour chaque question du dataset
             for index_type in ["code", "docs"]:
                 try:
                     searcher.load_index_files(index_type=index_type)
                     sources = searcher.search(query=query_text, k=k)
-                    
+                    last_sources = sources
+
                     for src in sources:
                         for chunk in searcher.all_chunks_raw:
                             if (
                                 chunk["source"]["file_path"] == src.file_path
-                                and chunk["source"]["first_character_index"] == src.first_character_index
+                                and chunk["source"]["first_character_index"]
+                                == src.first_character_index
                             ):
                                 contexts.append(chunk["text_content"])
                 except Exception:
@@ -203,7 +206,15 @@ class RagCLI:
                 {
                     "question_id": item.get("question_id"),
                     "question": query_text,
-                    "generated_answer": answer_text,
+                    "retrieved_sources": [
+                        {
+                            "file_path": src.file_path,
+                            "first_character_index": src.first_character_index,
+                            "last_character_index": src.last_character_index,
+                        }
+                        for src in last_sources
+                    ],
+                    "answer": answer_text,
                 }
             )
 
@@ -222,6 +233,13 @@ class RagCLI:
             print(f"Error while saving result: {e}")
 
         print(f"\nResults saved to {output_file}")
+
+    def evaluate(self, student_answer_path: str, dataset_path: str) -> None:
+        """Evaluates search results against ground truth annotations."""
+        from src.evaluator import calculate_recall_at_k
+
+        calculate_recall_at_k(student_answer_path, dataset_path)
+
 
 def main() -> None:
     """Main entry point for Python Fire."""

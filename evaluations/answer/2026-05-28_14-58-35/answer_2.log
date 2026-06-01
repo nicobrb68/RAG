@@ -1,1 +1,0 @@
-VLLM supports the `chat completions.create` endpoint for text-to-text models.

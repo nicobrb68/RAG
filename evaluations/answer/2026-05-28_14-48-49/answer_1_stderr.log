@@ -1,3 +1,0 @@
-BM25S Retrieve:   0%|          | 0/1 [00:00<?, ?it/s]                                                     Model not found at data/models/Qwen/Qwen3-0.6B.
-Downloading Qwen GGUF from Hugging Face... Please wait...
-RuntimeError: Automated download failed: [Errno 2] No such file or directory: 'data/models/Qwen/Qwen3-0.6B'
