@@ -121,7 +121,7 @@ class RagCLI:
 
             print(f"Dataset processed! Results saved to {output_file}")
 
-        except (PermissionError, FileNotFoundError) as e:
+        except (PermissionError, FileNotFoundError, OSError) as e:
             print(f"Error: Failed to save results to disk. Details: {e}")
 
     def answer(self, query: str, k: int = 5) -> None:
@@ -144,7 +144,8 @@ class RagCLI:
                             == src.first_character_index
                         ):
                             contexts.append(chunk["text_content"])
-            except Exception:
+            except Exception as e:
+                print(f"Warning: Missing or invalid index : {e}")
                 continue
 
         generator = AnswerGenerator()
@@ -195,7 +196,8 @@ class RagCLI:
                                 == src.first_character_index
                             ):
                                 contexts.append(chunk["text_content"])
-                except Exception:
+                except Exception as e:
+                    print(f"Warning Problem with index : {e}")
                     continue
 
             answer_text = generator.generate_answer(

@@ -186,7 +186,6 @@ class SearchSystem(BaseModel):
         try:
             is_code_mode = self.index_type_meta == "code"
 
-            # --- TON QUERY STRIPPING VALIDÉ ---
             if not is_code_mode:
                 question_words = {"using", "command"}
 

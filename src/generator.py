@@ -59,6 +59,7 @@ class AnswerGenerator(BaseModel):
                 flash_attn=True,
                 verbose=False,
             )
+        # urllib.error.URLError
         except Exception as e:
             print(
                 f"RuntimeError: Failed to load Llama-CPP model: {e}",
@@ -109,7 +110,7 @@ class AnswerGenerator(BaseModel):
                 r"<think>.*?</think>", "", answer, flags=re.DOTALL
             ).strip()
 
-            # Nettoyage minimal des caractères bizarres et espaces
+            # Nettoyage minimal des caractères bizarres
             answer = re.sub(r"[^\x00-\x7F]+", "", answer).strip()
             answer = answer.strip(':,.-"\' `')
 
@@ -127,7 +128,7 @@ class AnswerGenerator(BaseModel):
 
             return answer
 
-        except Exception:
+        except (KeyError, IndexError, ValueError, OSError):
             return "Information not found."
 
     def generate_answers_batch(

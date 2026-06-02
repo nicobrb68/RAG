@@ -3,7 +3,7 @@ import json
 
 def calculate_recall_at_k(student_answer_path: str, dataset_path: str) -> None:
     """Calcule le Recall@k réel basé sur la détection des fichiers sources."""
-    # 1. Chargement de tes résultats de recherche (générés par search_dataset)
+    # similaire au calcul moulinette recall
     try:
         with open(student_answer_path, "r", encoding="utf-8") as f:
             student_data = json.load(f)
@@ -12,7 +12,7 @@ def calculate_recall_at_k(student_answer_path: str, dataset_path: str) -> None:
                 or student_data.get("generation_results")
                 or []
             )
-    except Exception as e:
+    except (FileNotFoundError,  json.JSONDecodeError, OSError) as e:
         print(f"Error loading student results: {e}")
         return
 
@@ -20,7 +20,7 @@ def calculate_recall_at_k(student_answer_path: str, dataset_path: str) -> None:
         with open(dataset_path, "r", encoding="utf-8") as f:
             ground_truth_data = json.load(f)
             gt_questions = ground_truth_data.get("rag_questions", [])
-    except Exception as e:
+    except (FileNotFoundError,  json.JSONDecodeError, OSError) as e:
         print(f"Error loading ground truth dataset: {e}")
         return
 

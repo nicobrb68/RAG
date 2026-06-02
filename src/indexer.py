@@ -37,7 +37,7 @@ class CodeIndexer(BaseModel):
             print(f"Error with the data file: {e}, End of program")
             sys.exit(1)
 
-        # SECTORISATION CHIRURGICALE CODE VS DOC
+        # Double chunk differend selon type de donnee
         if path.suffix == ".py":
             les_separateurs = [""]
             overlap = 380
@@ -59,7 +59,7 @@ class CodeIndexer(BaseModel):
         for chunk in chunked_data:
             chunk = chunk[: self.max_chunk_size]
 
-            # On cherche la position du morceau dans le texte complet
+            # position du morceau dans le texte complet
             start = full_data.find(chunk, current_search_start)
             if start == -1:
                 start = full_data.find(chunk)
