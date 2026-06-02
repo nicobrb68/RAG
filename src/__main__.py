@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 import fire
 from src.indexer import CodeIndexer
 from src.searcher import SearchSystem
+import sys
 
 
 class RagCLI:
@@ -15,6 +16,13 @@ class RagCLI:
         Args:
             max_chunk_size: Maximum character length for each chunk.
         """
+        try:
+            max_chunk_size = int(max_chunk_size)
+            if max_chunk_size <= 0:
+                raise ValueError
+        except ValueError:
+            print("Incorrect or negative max_chunk_size, end of programm")
+            sys.exit(1)
         print(f"Starting indexing with max_chunk_size={max_chunk_size}...")
         indexer = CodeIndexer(max_chunk_size=max_chunk_size)
         chunks = indexer.path_to_directory("data/raw/vllm-0.10.1")
