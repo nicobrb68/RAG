@@ -8,7 +8,7 @@ MODULE_NAME = src
 
 install:
 	@echo "Installing dependencies with uv..."
-	uv pip install -r pyproject.toml
+	uv sync
 
 
 run:
